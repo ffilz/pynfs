@@ -434,7 +434,7 @@ def testLargeReadWrite(t, env):
     ops = c.use_obj(fh)
     ops += [op.read(stateid, 0, size)]
     ops += [op.write(stateid, 0, UNSTABLE4, writedata)]
-    res = c.compound(ops)
+    res = c.compound(ops, delay=5)
     check(res)
     data = res.resarray[-2].switch.switch.data
     if len(data) != len(writedata):

@@ -318,7 +318,7 @@ class NFS4Client(rpc.RPCClient):
         self.nfs4unpacker.reset(res)
         self.nfs4unpacker.done()
 
-    def compound(self, argarray, tag='', minorversion=0):
+    def compound(self, argarray, tag='', minorversion=0, delay=0):
         """Make COMPOUND procedure call"""
         if type(argarray) is not list:
             raise "Need list for argarray"
@@ -337,7 +337,7 @@ class NFS4Client(rpc.RPCClient):
         un_p = self.nfs4unpacker
         p.reset()
         p.pack_COMPOUND4args(compoundargs)
-        res = self.call(NFSPROC4_COMPOUND, p.get_buffer())
+        res = self.call(NFSPROC4_COMPOUND, p.get_buffer(), delay=delay)
         un_p.reset(res)
         res = un_p.unpack_COMPOUND4res()
         if SHOW_TRAFFIC:

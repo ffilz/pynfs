@@ -14,6 +14,7 @@ import socket
 import select
 import threading
 import errno
+import time
 
 from rpc.rpc_const import *
 from rpc.rpc_type import *
@@ -407,14 +408,21 @@ class RPCClient(object):
         self.check_reply(out)
         return rdata
 
-    def call(self, procedure, data='', program=None, version=None):
+    def call(self, procedure, data='', program=None, version=None, delay=0):
         """Make an RPC call to the server
 
         Takes as input packed arguments
         Returns packed results
         """
         xid = self.send(procedure, data, program, version)
-        return self.listen(xid)
+        if delay != 0:
+            print("Sleeping %d", delay)
+            time.sleep(delay)
+            print("Sleep Done")
+        res = self.listen(xid)
+        if delay != 0:
+            print("Listen Done")
+        return res
 
     def get_new_xid(self): # Thread safe
         self.lock.acquire()
