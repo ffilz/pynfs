@@ -226,6 +226,8 @@ def main():
                      formatter=IndentedHelpFormatter(2, 25)
                      )
     opt, args = scan_options(p)
+    opt.version = 4
+    # minorversion from option
     environment.nfs4client.SHOW_TRAFFIC = opt.showtraffic
 
     # Create test database

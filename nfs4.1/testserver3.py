@@ -25,20 +25,17 @@
 # Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
 
+import use_local # HACK so don't have to rebuild constantly
 import sys
 if sys.hexversion < 0x03020000:
     print("Requires python 3.2 or higher")
     sys.exit(1)
 import os
-# Allow to be run stright from package root
-if  __name__ == "__main__":
-    if os.path.isfile(os.path.join(sys.path[0], 'lib', 'testmod.py')):
-        sys.path.insert(1, os.path.join(sys.path[0], 'lib'))
 
-import nfs4lib
+import nfs3lib
 import testmod
 from optparse import OptionParser, OptionGroup, IndentedHelpFormatter
-import servertests.environment as environment
+import server3tests.environment3 as environment
 import socket
 import rpc.rpc as rpc
 import pickle
@@ -46,7 +43,7 @@ import pickle
 VERSION="0.2" # How/when update this?
 
 # Auth_sys defaults
-HOST = socket.gethostname()
+HOST = os.fsencode(socket.gethostname())
 if not hasattr(os, "getuid"):
     UID = 4321
 else:
@@ -55,20 +52,6 @@ if not hasattr(os, "getgid"):
     GID = 42
 else:
     GID = os.getgid()
-
-def unixpath2comps(str, pathcomps=None):
-    if pathcomps is None or str[0] == '/':
-        pathcomps = []
-    else:
-        pathcomps = pathcomps[:]
-    for component in str.split(b'/'):
-        if (component == b'') or (component == b'.'):
-            pass
-        elif component == b'..':
-            pathcomps = pathcomps[:-1]
-        else:
-            pathcomps.append(component)
-    return pathcomps
 
 def scan_options(p):
     """Parse command line options
@@ -91,9 +74,6 @@ def scan_options(p):
                  help="Store test results in xml format [%default]")
     p.add_option("--debug_fail", action="store_true", default=False,
                  help="Force some checks to fail")
-    p.add_option("--minorversion", type="int", default=0,
-                 metavar="MINORVERSION", help="Choose NFSv4 minor version")
-
     g = OptionGroup(p, "Security flavor options",
                     "These options choose or affect the security flavor used.")
     g.add_option("--security", default='sys',
@@ -163,7 +143,9 @@ def scan_options(p):
     g.add_option("--usedir", default=None, metavar="OBJPATH",
                  help="Use SERVER:/OBJPATH as directory")
     g.add_option("--usespecial", default=None, metavar="OBJPATH",
-                 help="Use SERVER:/OBJPATH as obj for certain specialized tests")
+                 help="Use SERVER:/OBJPATH as directory")
+    g.add_option("--userofs", default=None, metavar="DIRPATH",
+                 help="Use SERVER:/DIRPATH for ROFS tests")
     g.add_option("--usefh", default=None, metavar="FH",
                  help="Use FH for certain specialized tests")
     p.add_option_group(g)
@@ -175,6 +157,7 @@ def scan_options(p):
     g.add_option("--secure", action="store_true", default=False,
                  help="Try to use 'secure' port number <1024 for client [False]")
     p.add_option_group(g)
+
 
     g = OptionGroup(p, "Server reboot script options",
                     "When running reboot scripts, these options determine "
@@ -204,6 +187,8 @@ class Argtype(object):
 def run_filter(test, options):
     """Determine whether a test was directly asked for by the command line."""
     run = False   # default
+    if not (test.versions[0] <= options.minorversion <= test.versions[1]):
+        return run
     for arg in options.args:
         if arg.isflag:
             if test.flags & arg.obj:
@@ -231,7 +216,6 @@ def printflags(list):
             print(s)
 
 def main():
-    nfail = -1
     p = OptionParser("%prog SERVER:/PATH [options] flags|testcodes\n"
                      "       %prog --help\n"
                      "       %prog SHOWOPTION",
@@ -239,14 +223,12 @@ def main():
                      formatter=IndentedHelpFormatter(2, 25)
                      )
     opt, args = scan_options(p)
-    opt.version = 4
+    opt.version = 3
     opt.minorversion = 0
-    nfs4lib.SHOW_TRAFFIC = opt.showtraffic
-
-    opt.machinename = os.fsencode(opt.machinename)
+    environment.nfs3client.SHOW_TRAFFIC = opt.showtraffic
 
     # Create test database
-    tests, fdict, cdict = testmod.createtests('servertests')
+    tests, fdict, cdict = testmod.createtests('server3tests')
 
     # Deal with any informational options
     if opt.showflags:
@@ -269,21 +251,15 @@ def main():
     if not args:
         p.error("Need a server")
     url = args.pop(0)
-    server_list, opt.path = nfs4lib.parse_nfs_url(url)
+    server_list, opt.path = nfs3lib.parse_nfs_url(url)
 
     if not server_list:
         p.error("%s not a valid server name" % url)
 
     opt.server, opt.port = server_list[0]
 
-    if not opt.port:
-        opt.port = 2049
-    else:
-        opt.port = int(opt.port)
-    if not opt.path:
-        opt.path = []
-    else:
-        opt.path = unixpath2comps(opt.path)
+    if not args:
+        p.error("No tests given")
 
     # Check --use* options are valid
     for attr in dir(opt):
@@ -291,9 +267,8 @@ def main():
             path = getattr(opt, attr)
             #print(attr, path)
             if path is None:
-                path = opt.path + [b'tree', os.fsencode(attr[3:])]
+                path = opt.path + b'tree' + os.fsencode(attr[3:])
             else:
-                path = os.fsencode(path)
                 # FIXME - have funct that checks path validity
                 if path[0] != b'/':
                     p.error("Need to use absolute path for --%s" % attr)
@@ -301,25 +276,32 @@ def main():
                 if path[-1] == b'/' and attr != 'usedir':
                     p.error("Can't use dir for --%s" %attr)
                 try:
-                    path = unixpath2comps(path)
+                    path = nfs4lib.path_components(path)
                 except Exception as e:
                     p.error(e)
             setattr(opt, attr, [comp for comp in path if comp])
 
-    opt.path += [b'tmp']
-
     # Check that --security option is valid
-    # sets --flavor to a rpc.SecAuth* class, and sets flags for its options
-    valid = rpc.supported.copy()
-    # FIXME - STUB - the only gss mech available is krb5
-    if 'gss' in valid:
-        valid['krb5'] =  valid['krb5i'] =  valid['krb5p'] = valid['gss']
-        del valid['gss']
-    if opt.security not in valid:
+    # FIXME STUB
+    tempd = {'none' : (rpc.AUTH_NONE, 0),
+             'sys'  : (rpc.AUTH_SYS, 0),
+             'krb5' : (rpc.RPCSEC_GSS, 1),
+             'krb5i': (rpc.RPCSEC_GSS, 2),
+             'krb5p': (rpc.RPCSEC_GSS, 3),
+             }
+    if opt.security not in tempd:
         p.error("Unknown security: %s\nValid flavors are %s" %
-                (opt.security, str(valid.keys())))
-    opt.flavor = valid[opt.security]
-    opt.service = {'krb5':1, 'krb5i':2, 'krb5p':3}.get(opt.security, 0)
+                (opt.security, str(tempd.keys())))
+
+    # flavor has changed from class to int
+    opt.flavor, opt.service = tempd[opt.security]
+
+    if opt.flavor not in rpc.security.supported:
+        if opt.flavor == rpc.RPCSEC_GSS:
+            p.error("RPCSEC_GSS not supported,"
+                    " could not find compile gssapi module")
+        else:
+            p.error("Unsupported security flavor")
 
     # Make sure args are valid
     opt.args = []
@@ -371,14 +353,14 @@ def main():
         if opt.outfile is not None:
             pickle.dump(tests, fd, 0)
         if not clean_finish:
-            nfail = testmod.printresults(tests, opt)
+            testmod.printresults(tests, opt)
     try:
         fail = False
         env.finish()
     except Exception as e:
         fail = True
         err = str(e)
-    nfail = testmod.printresults(tests, opt)
+    testmod.printresults(tests, opt)
     if fail:
         print("\nWARNING: could not clean testdir due to:\n%s\n" % err)
 
@@ -386,11 +368,6 @@ def main():
         testmod.json_printresults(tests, opt.jsonout)
     elif opt.xmlout is not None:
         testmod.xml_printresults(tests, opt.xmlout)
-
-    if nfail < 0:
-        sys.exit(3)
-    if nfail > 0:
-        sys.exit(2)
 
 if __name__ == "__main__":
     main()
