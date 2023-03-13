@@ -227,7 +227,7 @@ class RPCClient(object):
                 sock.bind(('', port))
                 return
             except socket.error as why:
-                if why[0] == errno.EADDRINUSE:
+                if why == errno.EADDRINUSE:
                     port += 1
                 else:
                     print("Could not use low port")
