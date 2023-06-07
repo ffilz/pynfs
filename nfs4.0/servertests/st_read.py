@@ -249,7 +249,7 @@ def testStolenStateid(t, env):
     res = c.create_file(t.word(), attrs={FATTR4_MODE: 0o600})
     fh, stateid = c.confirm(t.word(), res)
     security=c.security
-    c.security=rpc.SecAuthSys(0, "whatever", 3912, 2422, [])
+    c.security=rpc.SecAuthSys(0, b"whatever", 3912, 2422, [])
     res = c.read_file(fh, stateid=stateid)
     c.security=security
     check(res, [NFS4ERR_ACCESS, NFS4ERR_PERM], "READ with stolen stateid")
