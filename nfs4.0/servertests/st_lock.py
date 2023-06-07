@@ -566,28 +566,28 @@ def testFairness(t, env):
     check(res1, msg="Locking file %s" % t.word())
     # Second owner is denied a blocking lock
     file = c.homedir + [t.word()]
-    fh2, stateid2 = c.open_confirm("owner2", file,
+    fh2, stateid2 = c.open_confirm(b"owner2", file,
                                    access=OPEN4_SHARE_ACCESS_BOTH,
                                    deny=OPEN4_SHARE_DENY_NONE)
-    res2 = c.lock_file("owner2", fh2, stateid2,
-                       type=WRITEW_LT, lockowner="lockowner2_LOCK18")
+    res2 = c.lock_file(b"owner2", fh2, stateid2,
+                       type=WRITEW_LT, lockowner=b"lockowner2_LOCK18")
     check(res2, NFS4ERR_DENIED, msg="Conflicting lock on %s" % t.word())
     # Standard owner releases lock
     res1 = c.unlock_file(1, fh1, res1.lockid)
     check(res1)
     # Third owner tries to butt in and steal lock second owner is waiting for
     file = c.homedir + [t.word()]
-    fh3, stateid3 = c.open_confirm("owner3", file,
+    fh3, stateid3 = c.open_confirm(b"owner3", file,
                                    access=OPEN4_SHARE_ACCESS_BOTH,
                                    deny=OPEN4_SHARE_DENY_NONE)
-    res3 = c.lock_file("owner3", fh3, stateid3,
-                       type=WRITEW_LT, lockowner="lockowner3_LOCK18")
+    res3 = c.lock_file(b"owner3", fh3, stateid3,
+                       type=WRITEW_LT, lockowner=b"lockowner3_LOCK18")
     if res3.status == NFS4_OK:
         t.pass_warn("Locking is not fair")
     check(res3, NFS4ERR_DENIED, msg="Tried to grab lock on %s while another is waiting" % t.word())
     # Second owner goes back and gets his lock
-    res2 = c.lock_file("owner2", fh2, stateid2,
-                       type=WRITEW_LT, lockowner="lockowner2_LOCK18")
+    res2 = c.lock_file(b"owner2", fh2, stateid2,
+                       type=WRITEW_LT, lockowner=b"lockowner2_LOCK18")
     check(res2)
 
 def testBlockPoll(t, env):
@@ -605,36 +605,36 @@ def testBlockPoll(t, env):
     check(res1, msg="Locking file %s" % t.word())
     # Second owner is denied a blocking lock
     file = c.homedir + [t.word()]
-    fh2, stateid2 = c.open_confirm("owner2", file,
+    fh2, stateid2 = c.open_confirm(b"owner2", file,
                                    access=OPEN4_SHARE_ACCESS_BOTH,
                                    deny=OPEN4_SHARE_DENY_NONE)
-    res2 = c.lock_file("owner2", fh2, stateid2,
-                       type=WRITEW_LT, lockowner="lockowner2_LOCK19")
+    res2 = c.lock_file(b"owner2", fh2, stateid2,
+                       type=WRITEW_LT, lockowner=b"lockowner2_LOCK19")
     check(res2, NFS4ERR_DENIED, msg="Conflicting lock on %s" % t.word())
     sleeptime = c.getLeaseTime() // 2
     # Poll for lock
     for i in range(4):
         # Note this renews for standard owner
         env.sleep(sleeptime, "Waiting for lock release")
-        res2 = c.lock_file("owner2", fh2, stateid2,
-                           type=WRITEW_LT, lockowner="lockowner2_LOCK19")
+        res2 = c.lock_file(b"owner2", fh2, stateid2,
+                           type=WRITEW_LT, lockowner=b"lockowner2_LOCK19")
         check(res2, NFS4ERR_DENIED, msg="Conflicting lock on %s" % t.word())
     # Standard owner releases lock
     res1 = c.unlock_file(1, fh1, res1.lockid)
     check(res1)
     # Third owner tries to butt in and steal lock second owner is waiting for
     file = c.homedir + [t.word()]
-    fh3, stateid3 = c.open_confirm("owner3", file,
+    fh3, stateid3 = c.open_confirm(b"owner3", file,
                                    access=OPEN4_SHARE_ACCESS_BOTH,
                                    deny=OPEN4_SHARE_DENY_NONE)
-    res3 = c.lock_file("owner3", fh3, stateid3,
-                       type=WRITEW_LT, lockowner="lockowner3_LOCK19")
+    res3 = c.lock_file(b"owner3", fh3, stateid3,
+                       type=WRITEW_LT, lockowner=b"lockowner3_LOCK19")
     if res3.status == NFS4_OK:
         t.pass_warn("Locking is not fair")
     check(res3, NFS4ERR_DENIED, msg="Tried to grab lock on %s while another is waiting" % t.word())
     # Second owner goes back and gets his lock
-    res2 = c.lock_file("owner2", fh2, stateid2,
-                       type=WRITEW_LT, lockowner="lockowner2_LOCK19")
+    res2 = c.lock_file(b"owner2", fh2, stateid2,
+                       type=WRITEW_LT, lockowner=b"lockowner2_LOCK19")
     check(res2)
 
 def testBlockTimeout(t, env):
@@ -694,7 +694,7 @@ def testBlockingQueue(t, env):
     c.init_connection()
     num_clients = 5
     file = c.homedir + [t.word()]
-    owner = ["owner%i" % i for i in range(num_clients)]
+    owner = [b"owner%i" % i for i in range(num_clients)]
     # Create the file
     fh = c.create_confirm(t.word(), deny=OPEN4_SHARE_DENY_NONE)[0]
     # Have each client open the file
@@ -710,7 +710,7 @@ def testBlockingQueue(t, env):
         for own in owner:
             i = geti(own)
             res[i] = c.lock_file(own, fh, stateid[i], lockseqid=seqid,
-                                 type=WRITEW_LT, lockowner="lock%s_LOCK21"%own)
+                                 type=WRITEW_LT, lockowner=b"lock%s_LOCK21"%own)
             if own == owner[0]:
                 check(res[i], msg="Locking file %s" % t.word())
             else:
@@ -725,7 +725,7 @@ def testBlockingQueue(t, env):
         for own in reverse(owner[2:]):
             i = geti(own)
             res[i] = c.lock_file(own, fh, stateid[i], lockseqid=seqid,
-                                 type=WRITEW_LT, lockowner="lock%s_LOCK21"%own)
+                                 type=WRITEW_LT, lockowner=b"lock%s_LOCK21"%own)
             if res[i].status == NFS4_OK:
                 t.pass_warn("Locking is not fair")
             check(res[i], NFS4ERR_DENIED,
@@ -748,15 +748,15 @@ def testLongPoll(t, env):
     res1 = c.lock_file(t.word(), fh1, stateid1, type=WRITE_LT)
     check(res1, msg="Locking file %s" % t.word())
     file = c.homedir + [t.word()]
-    fh2, stateid2 = c.open_confirm("owner2", file,
+    fh2, stateid2 = c.open_confirm(b"owner2", file,
                                    access=OPEN4_SHARE_ACCESS_BOTH,
                                    deny=OPEN4_SHARE_DENY_NONE)
-    fh3, stateid3 = c.open_confirm("owner3", file,
+    fh3, stateid3 = c.open_confirm(b"owner3", file,
                                    access=OPEN4_SHARE_ACCESS_BOTH,
                                    deny=OPEN4_SHARE_DENY_NONE)
     # Second owner is denied a blocking lock
-    res2 = c.lock_file("owner2", fh2, stateid2,
-                       type=WRITEW_LT, lockowner="lockowner2_LOCK22")
+    res2 = c.lock_file(b"owner2", fh2, stateid2,
+                       type=WRITEW_LT, lockowner=b"lockowner2_LOCK22")
     check(res2, NFS4ERR_DENIED, msg="Conflicting lock on %s" % t.word())
     sleeptime = c.getLeaseTime() - 5 # Just in time renewal
     badpoll = 0
@@ -766,15 +766,15 @@ def testLongPoll(t, env):
         time.sleep(1)
         if badpoll:
             # Third owner tries to butt in and steal lock
-            res3 = c.lock_file("owner3", fh3, stateid3,
-                               type=WRITEW_LT, lockowner="lockowner3_LOCK22")
+            res3 = c.lock_file(b"owner3", fh3, stateid3,
+                               type=WRITEW_LT, lockowner=b"lockowner3_LOCK22")
             if res3.status == NFS4_OK:
                 t.pass_warn("Locking is not fair")
             check(res3, NFS4ERR_DENIED,
                   "Tried to grab lock on %s while another is waiting" % t.word())
         if timeleft == sleeptime:
-            res2 = c.lock_file("owner2", fh2, stateid2,
-                               type=WRITEW_LT, lockowner="lockowner2_LOCK22")
+            res2 = c.lock_file(b"owner2", fh2, stateid2,
+                               type=WRITEW_LT, lockowner=b"lockowner2_LOCK22")
             check(res2, NFS4ERR_DENIED, msg="Conflicting lock on %s" % t.word())
         timeleft -= 1
         badpoll = not badpoll
@@ -782,14 +782,14 @@ def testLongPoll(t, env):
     res1 = c.unlock_file(1, fh1, res1.lockid)
     check(res1)
     # Third owner tries to butt in and steal lock second owner is waiting for
-    res3 = c.lock_file("owner3", fh3, stateid3,
-                       type=WRITEW_LT, lockowner="lockowner3_LOCK22")
+    res3 = c.lock_file(b"owner3", fh3, stateid3,
+                       type=WRITEW_LT, lockowner=b"lockowner3_LOCK22")
     if res3.status == NFS4_OK:
         t.pass_warn("Locking is not fair")
     check(res3, NFS4ERR_DENIED, msg="Tried to grab lock on %s while another is waiting" % t.word())
     # Second owner goes back and gets his lock
-    res2 = c.lock_file("owner2", fh2, stateid2,
-                       type=WRITEW_LT, lockowner="lockowner2_LOCK22")
+    res2 = c.lock_file(b"owner2", fh2, stateid2,
+                       type=WRITEW_LT, lockowner=b"lockowner2_LOCK22")
     check(res2)
 
 ####################################
@@ -929,3 +929,5 @@ def testOpenUpgradeLock(t, env):
     os.downgrade(OPEN4_SHARE_ACCESS_WRITE)
     os.lock(WRITE_LT)
     os.close()
+
+

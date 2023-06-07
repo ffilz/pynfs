@@ -426,7 +426,7 @@ def testLargeReadWrite(t, env):
     maxread, maxwrite = _get_iosize(t, c, c.homedir)
     # linux server really should be able to handle (maxread, maxwrite)
     # but can't:
-    size = min(maxread/4, maxwrite/4)
+    size = min(maxread//4, maxwrite//4)
     writedata = b'A'*size
     attrs = {FATTR4_SIZE: size}
     fh, stateid = c.create_confirm(t.word(), attrs=attrs,
@@ -456,8 +456,8 @@ def testMultipleReadWrites(t,env):
 
     # random offsets, one on a 4096-byte page boundary:
     offsets = [0, 516, 3025, 7026, 8192, 15284]
-    data = ""
-    for i in range(0, (offsets[-1] + 3)/4):
+    data = b""
+    for i in range(0, (offsets[-1] + 3)//4):
         data += struct.pack('>L', i)
     c = env.c1
     c.init_connection()
