@@ -315,7 +315,7 @@ def _testCbGetattr(t, env, change=0, size=0):
         fail("FATTR4_OPEN_ARGUMENTS not supported")
 
     if caps[FATTR4_SUPPORTED_ATTRS] & FATTR4_OPEN_ARGUMENTS:
-        if caps[FATTR4_OPEN_ARGUMENTS].oa_share_access_want & OPEN_ARGS_SHARE_ACCESS_WANT_DELEG_TIMESTAMPS:
+        if caps[FATTR4_OPEN_ARGUMENTS].oa_share_access_want & (1<<OPEN_ARGS_SHARE_ACCESS_WANT_DELEG_TIMESTAMPS):
             openmask |= 1<<OPEN_ARGS_SHARE_ACCESS_WANT_DELEG_TIMESTAMPS
 
     fh, deleg = __create_file_with_deleg(sess1, env.testname(t), openmask)
@@ -346,10 +346,24 @@ def _testCbGetattr(t, env, change=0, size=0):
     # wait for the CB_GETATTR
     completed = cb.wait(2)
     res = sess2.listen(slot)
+
+    # Handle NFS4ERR_DELAY - retry until we get NFS4_OK
+    retry_count = 0
+    max_retries = 5
+    while res.status == NFS4ERR_DELAY and retry_count < max_retries:
+        time.sleep(0.1)
+        res = sess2.compound([op.putfh(fh), op.getattr(1<<FATTR4_CHANGE | 1<<FATTR4_SIZE |
+            1<<FATTR4_TIME_ACCESS | 1<<FATTR4_TIME_MODIFY)])
+        retry_count += 1
+
+    if res.status == NFS4ERR_DELAY:
+        fail(f"GETATTR still returning DELAY after {max_retries} retries")
+
     attrs2 = res.resarray[-1].obj_attributes
     sess1.compound([op.putfh(fh), op.delegreturn(deleg.write.stateid)])
-    check(res, [NFS4_OK, NFS4ERR_DELAY])
-    if not completed:
+    # Only expect NFS4_OK now since we handle DELAY
+    check(res, [NFS4_OK])
+    if not cb.is_set():
         fail("CB_GETATTR not received")
     return attrs1, attrs2
 
